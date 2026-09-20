@@ -1,4 +1,4 @@
-# sovietkit
+# Anarchy / QOL 
 
 Three mods for **Workers & Resources: Soviet Republic**, in one
 [TesmioLoader](https://steamcommunity.com/sharedfiles/filedetails/?id=3620742954)
