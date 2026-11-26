@@ -1,15 +1,17 @@
 # sovietkit
 
-Three mods for **Workers & Resources: Soviet Republic**, in one tesmio plugin.
-Version 1.4. Built against **SOVIET64.exe v1.1.1.9** (PE TimeDateStamp
+Four mods for **Workers & Resources: Soviet Republic**, in one tesmio plugin.
+Version 1.5. Built against **SOVIET64.exe v1.1.1.9** (PE TimeDateStamp
 `0x6A3EB6AD`); on any other build every part says so in the log, hooks nothing
-and patches nothing.
+and patches nothing. (Walking is the exception: it also knows v1.2.0.8 and has
+its own table per build — see [Walking](#walking) below.)
 
 | part | what it does | key |
 |---|---|---|
 | **anarchy** | every "you can't build that there" goes quiet — slope, angle, terrain, water, collisions, crossings, connection rules | `Alt+F` |
 | **skins** | recolour a building with the game's own spray-can and every one of that type you place afterwards is built wearing it | none needed |
 | **better trackbuilders** | rail construction trains ignore signals and each other, and one-way signals can be made two-way for routing | on by default; `Ctrl+Alt+D` for the one-way switch |
+| **walking** | the longest path a citizen will walk (and drive) is a setting instead of 480 m / 2500 m | none; `[walking]` in the ini |
 
 Any part can be switched off at the top of `sovietkit.ini` without touching the
 other two:
@@ -19,6 +21,7 @@ other two:
 anarchy   = 1
 skins     = 1
 trackcrew = 1
+walking   = 1
 ```
 
 Every key is rebindable in `[keys]`, and so is the modifier each group uses.
@@ -31,7 +34,7 @@ Every key is rebindable in `[keys]`, and so is the modifier each group uses.
 | `Ctrl+Alt+T` | anarchy layer 1 — **the panic key**, takes anarchy down with it |
 | `Ctrl+Alt+G` | better trackbuilders on / off |
 | `Ctrl+Alt+D` | one-way semaphores on / off **for routing** — read the warning below |
-| `Ctrl+Alt+R` | the full report: all three parts, then the sites and counters |
+| `Ctrl+Alt+R` | the full report: all four parts, then the sites and counters |
 | `Ctrl+Alt+K` | zero every counter and census |
 | `Ctrl+Alt+` `C V A Z ] [ P S H` | the skins keys — copy, paste, apply-all, undo, next, previous, retain-on-pick, self test, hex dump |
 
@@ -271,7 +274,7 @@ serialise on that lock. It is a diagnostic level, not a play level.
 ## Install
 
 1. Put `sovietkit.cpp`, `sovietkit.ini`, `mod_*.inc`, `an_sites.h`, `skn_*.h`,
-   `tc_sites.h`, `tsm_diag.h`, `tesmio_api.h`, `tesmio_plugin.h` and
+   `tc_sites.h`, `wk_sites.h`, `tsm_diag.h`, `tesmio_api.h`, `tesmio_plugin.h` and
    `build-sovietkit.bat` in one folder.
 2. Run `build-sovietkit.bat`. It finds MSVC with `vswhere`, builds one
    translation unit, copies the DLL into `tesmioloader\build\plugins\`, and adds
@@ -285,6 +288,51 @@ switching a part off and saying why.
 
 If you still have `skins`, `anarchy`, `railfree` or `trackcrew` installed, take
 them out. They hook the same functions and only the first one to get there wins.
+
+## Walking
+
+`[walking]` in the ini. No key, no frame work: the limits are patched once at
+start and the part is done.
+
+| key | default | what |
+|---|---|---|
+| `enabled` | 1 | `0` installs nothing (the same as `[sovietkit] walking = 0`) |
+| `distance` | 1000 | metres of **path** a citizen will walk to a shop, job or service. Base game 480. `0` removes the limit and makes placement slow; above 20000 is clamped; negative reads as 480 |
+| `car_distance` | 2500 | the same for a citizen with a car. Base game 2500, so by default it is left alone |
+| `regen_on_load` | 1 | make the game's own regeneration pass run on every load so an existing city picks up the change. A few seconds of loading screen on a big city |
+| `probe` | 0 | log the bytes and values at every site before anything is written |
+
+`distance` is a length along roads and footpaths, not a straight line. A
+building 400 m away across a river may be 1200 m of walking.
+
+**Existing cities.** Each building's list of walkable neighbours is stored in the
+save, so a new `distance` only reaches what is built afterwards unless
+`regen_on_load` is on. Lowering it again works the same way in reverse: a save
+made while it was raised keeps its long connections until something rebuilds
+them. The save format is unchanged either way.
+
+**What is patched.** The game writes the walking limit out in four separate
+functions, with no shared constant, and every one that is missed does something
+half-true: the batch and the queued connection builders (the limit itself),
+the road-change collectors (a rebuild *radius*, held at `max(limit, 530)` and
+`max(car, 2600)`) and the overlay behind the walking-distance button (which
+re-runs the search with its own copy of the number). Seven of the eight are
+`movss xmm0,[rip+disp32]` reading the shared float pool, so the instruction's
+displacement is repointed at a float the part owns instead of overwriting the
+constant, which dozens of GUI readers share. The eighth is an `imm32` and is
+replaced. `regen_on_load` turns the save loader's `cmp [version],110` into a
+compare against 127 and `test al,al` into `xor al,al`.
+
+Everything is verified before it is written: the instruction shape, the address
+its displacement resolves to, and the value stored there. The two walking
+builders are applied together or not at all. See
+[WALKING-RE-FINDINGS.md](WALKING-RE-FINDINGS.md) for the sites and
+[`src/wk_sites.h`](../src/wk_sites.h) for the tables.
+
+**Game builds.** Built-in tables: v1.1.1.9 and v1.2.0.8. Any other build logs its
+stamp and is left alone. A new build is a `[sites]` edit and not a rebuild: run
+`tools/walking_scan.py SOVIET64.exe`, which checks a known build site by site or
+predicts a new one and prints the sixteen keys.
 
 ## What this cannot promise
 

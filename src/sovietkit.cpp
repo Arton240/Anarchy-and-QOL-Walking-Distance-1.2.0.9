@@ -1,4 +1,4 @@
-// sovietkit.cpp - three mods for Workers & Resources: Soviet Republic, in one
+// sovietkit.cpp - four mods for Workers & Resources: Soviet Republic, in one
 // DLL, with one ini, one log and one report.
 //
 //   anarchy    build it where you want it. Collision, slope, angle, terrain and
@@ -6,6 +6,8 @@
 //   skins      recolour a building with the game's own spray-can and every one
 //              of that type you place afterwards is built wearing that skin.
 //   trackcrew  rail construction trains ignore signals and each other.
+//   walking    how far a citizen will walk: the path-length limit the game
+//              builds every building's walking connections with.
 //
 // WHY ONE PLUGIN AND NOT THREE. They were three, and three was worse in ways
 // that were not obvious until they ran together:
@@ -25,7 +27,7 @@
 //   * Three logs to read, three inis to keep in step, three sets of build-stamp
 //     checks printing the same line.
 //
-// WHAT IS SHARED AND WHAT IS NOT. The three parts keep their own code, their
+// WHAT IS SHARED AND WHAT IS NOT. The parts keep their own code, their
 // own offsets and their own settings - each lives in its own namespace below and
 // its own [section] in the ini, and any of them can be switched off without
 // affecting the others. What they share is the plumbing: the log, the counters,
@@ -34,7 +36,7 @@
 // Every part still refuses to do anything at all if the executable is not the
 // build its offsets were read from.
 
-#define SOVIETKIT_VERSION "1.4"
+#define SOVIETKIT_VERSION "1.5"
 #define SK_INI "plugins\\sovietkit.ini"
 
 #include "tesmio_plugin.h"
@@ -200,11 +202,12 @@ static bool SkHotkeyEdge(int vk, int modifier, unsigned char* was)
 static int g_useAnarchy = 1;
 static int g_useSkins   = 1;
 static int g_useCrew    = 1;
+static int g_useWalking = 1;
 
 // Set when a part refuses to install - the build stamp did not match, a hook
 // was declined, its bytes had moved. A part that is off here is off for the
 // session and its frame work is skipped entirely.
-static int g_liveAnarchy, g_liveSkins, g_liveCrew;
+static int g_liveAnarchy, g_liveSkins, g_liveCrew, g_liveWalking;
 
 // Shared hotkeys: one report, one reset, for all three parts.
 static int g_sharedModifier = 4;
@@ -243,6 +246,14 @@ namespace crew {
 #include "mod_trackcrew.inc"
 }
 
+// Walking has no frame work and no hotkey: it patches the game's walking limits
+// once, at start, and that is all it does. It is not one of the three parts the
+// frame tick and the fault guards below are sized for.
+namespace walking {
+#include "wk_sites.h"
+#include "mod_walking.inc"
+}
+
 // =========================================================================
 //  the frame tick - ONE hook, three callbacks
 // =========================================================================
@@ -253,14 +264,16 @@ static void SkReportAll(void)
 {
     Dlog("==============================================================");
     Dlog("sovietkit %s - full report", SOVIETKIT_VERSION);
-    Dlog("  parts: anarchy %s, skins %s, trackcrew %s",
+    Dlog("  parts: anarchy %s, skins %s, trackcrew %s, walking %s",
          g_useAnarchy ? (g_liveAnarchy ? "on" : "ON BUT NOT INSTALLED") : "off",
          g_useSkins   ? (g_liveSkins   ? "on" : "ON BUT NOT INSTALLED") : "off",
-         g_useCrew    ? (g_liveCrew    ? "on" : "ON BUT NOT INSTALLED") : "off");
+         g_useCrew    ? (g_liveCrew    ? "on" : "ON BUT NOT INSTALLED") : "off",
+         g_useWalking ? (g_liveWalking ? "on" : "ON BUT NOT INSTALLED") : "off");
     Dlog("  frame hook %d", g_renderHooked);
     if (g_liveAnarchy) anarchy::Report();
     if (g_liveSkins)   skins::Report();
     if (g_liveCrew)    crew::Report();
+    if (g_liveWalking) walking::Report();
 
     // ONCE, not once per part. All three share one site table and one counter
     // table, so three parts each calling these printed the same forty lines
@@ -268,7 +281,7 @@ static void SkReportAll(void)
     Dlog("--------------------------------------------------------------");
     SiteVerifyAll();
     CountersDump();
-    if (!g_liveAnarchy && !g_liveSkins && !g_liveCrew)
+    if (!g_liveAnarchy && !g_liveSkins && !g_liveCrew && !g_liveWalking)
     {
         Dlog("  nothing is installed, so there is nothing to report. The lines");
         Dlog("  above the first heartbeat say why.");
@@ -446,6 +459,7 @@ extern "C" __declspec(dllexport) int TsmPluginInit(const TsmHost* host, TsmPlugi
     g_useAnarchy = SkCfgB("sovietkit", "anarchy",   true);
     g_useSkins   = SkCfgB("sovietkit", "skins",     true);
     g_useCrew    = SkCfgB("sovietkit", "trackcrew", true);
+    g_useWalking = SkCfgB("sovietkit", "walking",   true);
     g_trace      = SkCfgI("debug", "trace", 0, 0, 3);
 
     g_sharedModifier = SkCfgI("keys", "modifier", 4, 0, SK_MOD_MAX);
@@ -460,14 +474,15 @@ extern "C" __declspec(dllexport) int TsmPluginInit(const TsmHost* host, TsmPlugi
         Dlog("[keys] report and reset are both %#x - one press will do both", K_REPORT);
 
     DiagHeader("sovietkit", SOVIETKIT_VERSION,
-               "anarchy, skins and trackcrew in one plugin");
-    Dlog("parts wanted: anarchy %d, skins %d, trackcrew %d",
-         g_useAnarchy, g_useSkins, g_useCrew);
+               "anarchy, skins, trackcrew and walking in one plugin");
+    Dlog("parts wanted: anarchy %d, skins %d, trackcrew %d, walking %d",
+         g_useAnarchy, g_useSkins, g_useCrew, g_useWalking);
 
 
     if (g_useAnarchy) g_liveAnarchy = anarchy::ModInit() ? 1 : 0;
     if (g_useSkins)   g_liveSkins   = skins::ModInit()   ? 1 : 0;
     if (g_useCrew)    g_liveCrew    = crew::ModInit()    ? 1 : 0;
+    if (g_useWalking) g_liveWalking = walking::ModInit() ? 1 : 0;
 
     Logf("sovietkit  %s loaded", SOVIETKIT_VERSION);
     return 0;
@@ -475,15 +490,20 @@ extern "C" __declspec(dllexport) int TsmPluginInit(const TsmHost* host, TsmPlugi
 
 extern "C" __declspec(dllexport) int TsmPluginStart(void)
 {
-    // NOTHING WANTED, NOTHING HOOKED. With all three parts off in the ini there
-    // is nothing for a frame tick to run, and installing one anyway would cost a
-    // GetForegroundWindow, three GetAsyncKeyState and two hotkey edges every
-    // frame forever for three parts that are switched off. "Switch it off in the
-    // ini" has to switch the hook off too. Returning non-zero tells the loader
-    // it may unload us, which is true: nothing is patched at this point.
-    if (!g_useAnarchy && !g_useSkins && !g_useCrew)
+    // NOTHING WANTED, NOTHING HOOKED. With anarchy, skins and trackcrew all off
+    // in the ini there is nothing for a frame tick to run, and installing one
+    // anyway would cost a GetForegroundWindow, three GetAsyncKeyState and two
+    // hotkey edges every frame forever for parts that are switched off. "Switch
+    // it off in the ini" has to switch the hook off too. Walking has no frame
+    // work, so it neither needs the tick nor keeps it alive.
+    //
+    // Returning non-zero tells the loader it may unload us, which is true:
+    // nothing is patched at this point.
+    const bool wantFrame = g_useAnarchy || g_useSkins || g_useCrew;
+    if (!wantFrame && !g_liveWalking)
     {
-        Dlog("all three parts are off in the ini - nothing hooked, nothing patched.");
+        Dlog("every part is off in the ini, or has nothing to install on this build"
+             " - nothing hooked, nothing patched.");
         DiagFlush();
         return 1;
     }
@@ -491,7 +511,7 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     // THE CLOCK FIRST, AND IT IS SHARED. Without it there is no heartbeat, no
     // hotkey, and - the part that matters - no way to switch anarchy's byte
     // edits back off. So nothing else installs until this lands.
-    if (!g_renderHooked)
+    if (wantFrame && !g_renderHooked)
     {
         if (PatchIat(g_exe, DLL_ENGINE, "?Render@C3D_TERRAIN@@QEAAX_NPEAVC3D_CAMERA@@0HH@Z",
                      (void*)h_TerrainRender, (void**)&o_TerrainRender, "sovietkit frame"))
@@ -524,12 +544,16 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
             Dlog("and no hotkeys, which means no way to undo anything - so nothing");
             Dlog("is being installed at all.");
             g_liveAnarchy = g_liveSkins = g_liveCrew = 0;
+            // Walking is the exception, and the reason is that it does not depend
+            // on the tick: it writes once and never has to be undone at runtime.
+            if (g_liveWalking)
+                Dlog("(walking needs no frame tick, so it still installs.)");
             DiagFlush();
             // Non-zero, because it is TRUE here: no part has installed anything
             // (ModInit only reads the ini and registers sites), the IAT patch
             // just failed, and a dead DLL should not stay resident for the life
             // of the process.
-            return 1;
+            if (!g_liveWalking) return 1;
         }
     }
 
@@ -554,12 +578,14 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     if (g_liveAnarchy) g_liveAnarchy = anarchy::ModStart() ? 1 : 0;
     if (g_liveSkins)   g_liveSkins   = skins::ModStart()   ? 1 : 0;
     if (g_liveCrew)    g_liveCrew    = crew::ModStart()    ? 1 : 0;
+    if (g_liveWalking) g_liveWalking = walking::ModStart() ? 1 : 0;
 
     Dlog("--------------------------------------------------------------");
-    Dlog("ready: anarchy %s, skins %s, trackcrew %s",
+    Dlog("ready: anarchy %s, skins %s, trackcrew %s, walking %s",
          g_liveAnarchy ? "on" : (g_useAnarchy ? "FAILED" : "off"),
          g_liveSkins   ? "on" : (g_useSkins   ? "FAILED" : "off"),
-         g_liveCrew    ? "on" : (g_useCrew    ? "FAILED" : "off"));
+         g_liveCrew    ? "on" : (g_useCrew    ? "FAILED" : "off"),
+         g_liveWalking ? "on" : (g_useWalking ? "FAILED" : "off"));
     Dlog("shared keys (%s): report %#x, zero counters %#x",
          SkModifierName(g_sharedModifier), K_REPORT, K_RESET);
     DiagFlush();

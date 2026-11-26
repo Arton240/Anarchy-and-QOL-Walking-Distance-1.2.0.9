@@ -1,6 +1,6 @@
 # Anarchy / QOL 
 
-Three mods for **Workers & Resources: Soviet Republic**, in one
+Four mods for **Workers & Resources: Soviet Republic**, in one
 [TesmioLoader](https://steamcommunity.com/sharedfiles/filedetails/?id=3620742954)
 plugin.
 
@@ -9,6 +9,7 @@ plugin.
 | **anarchy** | every "you can't build that there" goes quiet — slope, angle, terrain, water, collisions, crossings, connection rules — and comes back on the same key | `Alt+F` |
 | **skins** | recolour a building with the game's own spray-can and every one of that type you place afterwards is built wearing it | none needed |
 | **better trackbuilders** | rail construction trains ignore signals and each other; one-way signals can be read as two-way for routing | on by default, `Ctrl+Alt+D` for the one-way switch |
+| **walking** | citizens walk further: the path-length limit the game builds every building's walking connections with is a setting (`distance`, base game 480 m), and so is the car one | none — set it in `[walking]` |
 
 The third part is still called `trackcrew` in the ini, in the source and in the
 log — that is its section name and its key prefix, and renaming it would quietly
@@ -16,7 +17,9 @@ break every existing `sovietkit.ini`.
 
 Built against **SOVIET64.exe v1.1.1.9** (PE `TimeDateStamp 0x6A3EB6AD`). On any
 other build every part says so in the log, hooks nothing and patches nothing —
-that is the message, not a crash.
+that is the message, not a crash. (One addition: **walking** also knows
+v1.2.0.8, so on that build it works while the other three refuse. It has no
+table for v1.2.0.9 yet — see *Walking distance* below.)
 
 ---
 
@@ -90,12 +93,42 @@ log says what you did, every time.
 
 **Keep a backup save.**
 
+## Walking distance
+
+By default a citizen only counts a shop, a job or a service as reachable on foot
+if the *path* to it (along roads and footpaths, not a straight line) is at most
+**480 m**, and one with a car up to **2500 m**. It is a hard cutoff. `[walking]`
+in `sovietkit.ini` makes both numbers settings:
+
+```ini
+[sovietkit]
+walking       = 1       ; 0 = this part installs nothing
+
+[walking]
+distance      = 1000    ; metres on foot. Base game 480. 0 = no limit (slow), max 20000
+car_distance  = 2500    ; metres by car.  Base game 2500
+regen_on_load = 1       ; rebuild every connection at load so an existing city uses it
+```
+
+The game spells the walking limit out in four separate functions (the two
+connection builders, the collectors that decide what to rebuild after a road
+changes, and the overlay behind the building window's walking-distance button),
+so all of them are patched, and a group that does not verify whole is not
+applied at all. Every site is checked against the exact instruction and value
+before anything is written. `docs/WALKING-RE-FINDINGS.md` has the sites and why.
+
+**Which game builds.** Walking carries address tables for **v1.1.1.9** (the
+build everything else here is read off) and **v1.2.0.8**. For any other build it
+logs the exe's stamp and writes nothing; `tools/walking_scan.py SOVIET64.exe`
+produces the `[sites]` lines to add one, and says plainly which of them it
+verified against the exe and which it only predicted.
+
 ## Reading the log
 
 Everything goes to `tesmioloader\build\sovietkit.log`. Startup should end with
 
 ```
-ready: anarchy on, skins on, trackcrew on
+ready: anarchy on, skins on, trackcrew on, walking on
 ```
 
 and above it, one block per part. The lines worth checking:
@@ -103,6 +136,7 @@ and above it, one block per part. The lines worth checking:
 * `370 of 370 match this build; 0 do not` — anarchy's byte edits
 * `hooked exe+0x6ac6e0` — trackcrew's one inline hook
 * `one-way semaphores: all 4 router bytes match this build.`
+* `walking 1000 m (base game 480), cars 2500 m ...` — walking's limits were patched
 
 `debug` and `trace` ship **off**. To diagnose something, set `[debug] trace = 2`
 and `debug = 1` in the part's own section, reproduce it, then press `Ctrl+Alt+R`
@@ -114,6 +148,7 @@ called *from*, which turns "it still refuses" into a function name.
 ```
 src/         one translation unit; the .inc files are included into namespaces
 plugins/     sovietkit.ini, the whole configuration, commented line by line
+tools/       walking_scan.py - finds the walking sites in a SOVIET64.exe (new game build)
 docs/        the reverse-engineering notes behind every offset in src/*_sites.h
 workshop/    what the Steam Workshop item contains
 ```

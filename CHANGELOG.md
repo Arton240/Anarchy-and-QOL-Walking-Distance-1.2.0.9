@@ -1,5 +1,49 @@
 # sovietkit changelog
 
+## 1.5 — walking 1.0
+
+A fourth part: **how far a citizen will walk**, as a setting. Ported from the
+TesmioLoader `walking` plugin (written for v1.2.0.8) into sovietkit's own
+structure.
+
+### walking 1.0
+
+* `[walking]` in `sovietkit.ini`: `distance` (metres of path on foot, base game
+  480, default 1000), `car_distance` (base game 2500, default left at 2500),
+  `regen_on_load` (default on) and `probe`. `[sovietkit] walking = 0` installs
+  nothing.
+* The game writes the limit out in four functions with no shared constant, so
+  all eight sites are patched: both walking connection builders, the parking
+  builder, both road-change collectors (held at `max(limit, vanilla radius)`)
+  and the three overlay sites behind the walking-distance button. The float
+  pool's shared `480.0` and `530.0` are never overwritten; one instruction's
+  displacement is repointed at a float the part owns.
+* **Applied whole or not at all.** The two walking builders are patched
+  together or neither is, and the parking builder likewise. A half-patched
+  limit would have citizens walk two different distances while the log said
+  "patched". The overlay and the rebuild radii are best-effort on top.
+* Every site is checked against the instruction shape, the constant it
+  resolves to and the value stored there before anything is written.
+  `regen_on_load` puts the first of its two edits back if the second fails.
+* **Address tables per build**, in `src/wk_sites.h`: v1.1.1.9 (the build the
+  rest of sovietkit is read off) and v1.2.0.8. **No v1.2.0.9 table yet** — no
+  executable was available to read one from. On an unknown build the part logs
+  the exe's PE stamp and writes nothing.
+* `[sites]` takes a complete table (`walk_build_stamp`, `walk_limit_op`, ...
+  sixteen keys, all or none) so a new build is an ini edit, not a rebuild.
+* `tools/walking_scan.py SOVIET64.exe` checks a known build site by site, or for
+  a new build lists candidates, predicts the table from the shift each region
+  moved by between the known builds, and prints the `[sites]` lines. It labels
+  them PREDICTED: they are structurally verified against the exe, not
+  disassembled.
+* Walking has no frame work and no hotkey, so with anarchy, skins and trackcrew
+  all off the frame hook is not installed, and if that hook cannot be installed
+  walking still applies.
+* New: `docs/WALKING-RE-FINDINGS.md`.
+
+**Not verified:** nothing here has been built with MSVC or run against the game
+or a SOVIET64.exe. See the last section of that document.
+
 ## 1.3 — anarchy 1.4, skins 0.6, trackcrew 1.0
 
 The release pass: one reported bug traced to its cause, one feature dropped for
