@@ -3,7 +3,7 @@ REM ===========================================================================
 REM  build-sovietkit.bat - builds sovietkit.dll with MSVC and installs it.
 REM
 REM  Run this from the folder it sits in. It needs, beside it:
-REM      sovietkit.cpp   sovietkit.ini   an_sites.h   skn_*.h   tc_sites.h   mod_*.inc   tsm_diag.h
+REM      sovietkit.cpp   sovietkit.ini   an_sites.h   skn_*.h   tc_sites.h   wk_sites.h   mod_*.inc   tsm_diag.h
 REM      tesmio_api.h   tesmio_plugin.h
 REM
 REM  ONE TRANSLATION UNIT - the headers are included from sovietkit.cpp and
@@ -104,20 +104,21 @@ echo   Run the game through tesmiolauncher.exe, then open
 echo       %GAME%\tesmioloader\build\sovietkit.log
 echo.
 echo   It should end with:
-echo       ready: anarchy on, skins on, trackcrew on
+echo       ready: anarchy on, skins on, trackcrew on, walking on
 echo.
 echo   and above that, one block per part. The lines worth reading:
 echo       114 of 114 match this build; 0 do not   (anarchy's byte edits)
 echo       all 5 sites match ...                   (skins' offsets)
 echo       hooked exe+0x6ac6e0                     (trackcrew's one hook)
+echo       walking 1000 m (base game 480) ...      (walking's patched limits)
 echo.
 echo   Then in game:
 echo       Alt+F        anarchy on and off. The word ANARCHY appears top right.
-echo       Ctrl+Alt+R   the full report - all three parts, then the counters
+echo       Ctrl+Alt+R   the full report - all four parts, then the counters
 echo       Ctrl+Alt+K   zero every counter
 echo.
 echo   Any part can be switched off at the top of sovietkit.ini without
-echo   touching the other two.
+echo   touching the others.
 echo.
 echo   A line reading "the game updated" means the exe is not v1.1.1.9 and
 echo   nothing was hooked. That is the design, not a failure.

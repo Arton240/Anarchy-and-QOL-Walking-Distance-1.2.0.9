@@ -1,5 +1,5 @@
 ===========================================================================
- SOVIETKIT 1.4 - Anarchy, Skins and Better Trackbuilders
+ SOVIETKIT 1.5 - Anarchy, Skins, Better Trackbuilders and Walking Distance
  for Workers & Resources: Soviet Republic  (1.1.1.9)
  Requires TesmioLoader
 ===========================================================================
@@ -55,7 +55,7 @@ DID IT WORK?
 
 should end with
 
-    ready: anarchy on, skins on, trackcrew on
+    ready: anarchy on, skins on, trackcrew on, walking on
 
 If it says something else, it says why on the line above. The most likely
 answer is that the game has updated: every offset in this plugin was read
@@ -119,9 +119,10 @@ matters, what it costs. The first block is the one most people want:
     anarchy   = 1
     skins     = 1
     trackcrew = 1
+    walking   = 1
 
 Setting one of those to 0 means that part installs nothing at all: no hooks,
-no patches, no hotkeys, no per-frame work. The other two are unaffected. It
+no patches, no hotkeys, no per-frame work. The others are unaffected. It
 is the first thing to try if you suspect one of them of anything.
 
 SAVE THE INI AS UTF-8 WITHOUT A BOM. PowerShell's -Encoding UTF8 writes a
@@ -151,6 +152,13 @@ A few worth knowing about:
         Off by default, and read its comment before turning it on. While it
         is on it is NOT limited to track builders: any train can plan a
         route the wrong way down a one-way section.
+
+    [walking] distance, car_distance, regen_on_load
+        How far a citizen will walk, in metres of path, and how far a citizen
+        with a car will drive. The game's own values are 480 and 2500;
+        distance ships at 1000. regen_on_load makes a city you already have
+        pick the new number up when you load it. Needs a build the plugin has
+        an address table for - the log says whether it has.
 
     [debug] trace  and  each part's  debug
         Both ship off. Turn them on together when something looks wrong,
